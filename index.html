@@ -1,0 +1,742 @@
+<!DOCTYPE html>
+<html lang="nl">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<meta name="apple-mobile-web-app-title" content="Paarden">
+<meta name="theme-color" content="#000000">
+<title>Paarden Boekhouding</title>
+<link rel="apple-touch-icon" href="data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><rect width='100' height='100' rx='22' fill='%23000'/><text x='50' y='68' font-size='60' text-anchor='middle'>🐴</text></svg>">
+<style>
+  *,*::before,*::after { box-sizing: border-box; -webkit-tap-highlight-color: transparent; }
+  html,body { margin:0; padding:0; background:#000; color:#fff; font-family:-apple-system,BlinkMacSystemFont,'SF Pro Text','Helvetica Neue',sans-serif; overscroll-behavior:none; }
+  body {
+    min-height:100vh;
+    padding: env(safe-area-inset-top) env(safe-area-inset-right) env(safe-area-inset-bottom) env(safe-area-inset-left);
+    user-select:none; -webkit-user-select:none;
+  }
+  .app { padding: 10px 10px 14px; max-width: 720px; margin: 0 auto; }
+
+  /* Title strip */
+  .topbar { display:flex; justify-content:space-between; align-items:center; margin: 4px 2px 10px; }
+  .topbar h1 { font-size: 15px; margin:0; color:#888; font-weight:500; letter-spacing:0.5px; text-transform:uppercase; }
+  .icon-btn {
+    background:#151515; border:1px solid #2a2a2a; color:#ddd; width:34px; height:34px; border-radius:10px;
+    display:inline-flex; align-items:center; justify-content:center; font-size:16px;
+  }
+  .icon-btn:active { background:#222; }
+
+  /* Subjects (4 horses + Algemeen) */
+  .subjects { display:grid; grid-template-columns: repeat(5, 1fr); gap:5px; margin-bottom: 12px; }
+  .btn-subject {
+    background:#111; color:#aaa; border:2px solid #222;
+    padding: 12px 0; border-radius: 12px; font-weight:700; font-size: 10px;
+    transition: transform .08s ease, background .15s, border-color .15s, color .15s;
+    overflow:hidden; text-overflow:ellipsis; white-space:nowrap;
+  }
+  .subjects { gap:4px; }
+  .btn-subject:active { transform: scale(0.96); }
+  .btn-subject.active.horse {
+    color:#fff;
+    background: linear-gradient(180deg, #ff5ea0 0%, #b8265e 100%);
+    border-color: #ff8fb6;
+    box-shadow: 0 0 18px rgba(255, 94, 160, 0.45);
+  }
+  .btn-subject.active.general {
+    color:#fff;
+    background: linear-gradient(180deg, #ffb300 0%, #b87a00 100%);
+    border-color: #ffd47a;
+    box-shadow: 0 0 18px rgba(255, 179, 0, 0.45);
+  }
+  .subject-emoji { display:block; font-size: 16px; margin-bottom: 2px; }
+
+  /* Items grid (changes with active subject) */
+  .items-grid {
+    display:grid; grid-template-columns: 1fr 1fr 1fr; gap: 8px;
+    padding: 12px 10px 14px; border-radius: 18px; margin-bottom: 12px;
+    box-shadow: inset 0 0 0 1px rgba(255,255,255,0.06);
+  }
+  .items-grid.horse {
+    background: linear-gradient(180deg, #29b6f6 0%, #134f78 70%, #062538 95%, #02141f 100%);
+  }
+  .items-grid.general {
+    background: linear-gradient(180deg, #ffb300 0%, #855a00 70%, #322000 95%, #1b1300 100%);
+  }
+  .btn-item {
+    background: rgba(0,0,0,0.42);
+    color: #fff;
+    border: 1px solid rgba(255,255,255,0.28);
+    padding: 18px 4px;
+    border-radius: 12px;
+    font-weight: 700;
+    font-size: 13px;
+    text-align: center;
+    min-height: 60px;
+    -webkit-backdrop-filter: blur(4px); backdrop-filter: blur(4px);
+    transition: transform .08s ease, background .15s;
+    word-break: keep-all;
+    line-height: 1.15;
+  }
+  .btn-item:active { transform: scale(0.95); background: rgba(0,0,0,0.62); }
+  .btn-item.span-full { grid-column: 1 / -1; }
+
+  /* Totals strip */
+  .totals { background:#0c0c0c; border:1px solid #1d1d1d; border-radius:14px; padding:10px 12px; margin-bottom:12px; }
+  .totals-head { display:flex; justify-content:space-between; align-items:center; margin-bottom:6px; }
+  .totals-head .label { font-size:12px; color:#888; text-transform:uppercase; letter-spacing:0.5px; }
+  .totals-head .grand { font-size:18px; font-weight:800; color:#fff; }
+  .item-breakdown { display:flex; flex-wrap:wrap; gap:6px; margin-top:4px; }
+  .bd-pill { background:#161616; border-radius:10px; padding:5px 9px; font-size:11px; color:#aaa; }
+  .bd-pill b { color:#fff; margin-left:6px; font-weight:700; font-size:12px; }
+  .bd-empty { color:#555; font-size:12px; padding:4px 0; }
+
+  /* Footer actions */
+  .actions { display:grid; grid-template-columns: 1fr 1fr; gap:8px; }
+  .action {
+    background:#101010; color:#e6e6e6; border:1px solid #232323; border-radius:14px;
+    padding: 12px 10px; font-weight:600; font-size:14px;
+    display:flex; align-items:center; justify-content:center; gap:8px;
+  }
+  .action:active { background:#1a1a1a; }
+  .action.primary { background: linear-gradient(180deg, #2b5fff 0%, #1640c2 100%); border-color:#4c7bff; }
+  .action.warn { background:#1a0d0d; border-color:#3a1f1f; color:#ffb3b3; }
+
+  /* Modal */
+  .overlay {
+    position:fixed; inset:0; background: rgba(0,0,0,0.75);
+    display:none; align-items:flex-end; justify-content:center; z-index: 50;
+    -webkit-backdrop-filter: blur(8px); backdrop-filter: blur(8px);
+  }
+  .overlay.show { display:flex; }
+  .sheet {
+    background: #0c0c0c; border-top: 1px solid #222; width: 100%; max-width: 720px;
+    border-top-left-radius: 22px; border-top-right-radius: 22px;
+    padding: 16px 16px calc(16px + env(safe-area-inset-bottom));
+    animation: slideUp .2s ease-out;
+  }
+  @keyframes slideUp { from { transform: translateY(60px); opacity:0; } to { transform: none; opacity:1; } }
+  .sheet h2 { margin: 4px 4px 14px; font-size:18px; font-weight:700; }
+  .sheet .sub { color:#888; font-size:13px; margin-left:4px; margin-bottom:10px; display:block; }
+  .amount-wrap { position:relative; margin-bottom: 12px; }
+  .amount-wrap .euro { position:absolute; left:14px; top:50%; transform:translateY(-50%); color:#888; font-size:22px; font-weight:600; }
+  #amount {
+    width:100%; background:#151515; border: 2px solid #2a2a2a; color:#fff;
+    font-size: 28px; font-weight:700; padding: 16px 16px 16px 38px;
+    border-radius: 14px; outline:none; -webkit-appearance:none;
+  }
+  #amount:focus { border-color:#4c7bff; }
+  #note {
+    width:100%; background:#151515; border:1px solid #2a2a2a; color:#fff;
+    font-size:15px; padding: 12px 14px; border-radius:12px; outline:none; -webkit-appearance:none;
+    margin-bottom: 12px;
+  }
+  .sheet-actions { display:grid; grid-template-columns: 1fr 1fr; gap:8px; }
+  .sheet-actions .cancel { background:#1a1a1a; border:1px solid #2a2a2a; color:#ccc; padding:14px; border-radius:14px; font-weight:600; }
+  .sheet-actions .save { background: linear-gradient(180deg, #00e676 0%, #06a851 100%); color:#03210e; padding:14px; border-radius:14px; font-weight:800; font-size:15px; border:none; }
+
+  /* History */
+  .history-wrap { max-height: 60vh; overflow-y: auto; -webkit-overflow-scrolling: touch; margin: 4px -4px 14px; }
+  .hist-row { display:grid; grid-template-columns: 70px 1fr auto auto; gap:8px; align-items:center; padding:10px 6px; border-bottom:1px solid #161616; font-size:13px; }
+  .hist-row .date { color:#777; font-size:11px; }
+  .hist-row .what { color:#ddd; }
+  .hist-row .amt { color:#fff; font-weight:700; min-width:70px; text-align:right; }
+  .hist-row .del { background:#1a0d0d; color:#ff8b8b; border:1px solid #3a1f1f; width:28px; height:28px; border-radius:8px; }
+  .hist-empty { text-align:center; color:#666; padding: 30px 10px; }
+
+  /* Toast */
+  .toast {
+    position: fixed; left:50%; top: calc(env(safe-area-inset-top) + 14px); transform: translateX(-50%);
+    background: #00e676; color:#062a14; font-weight:700; font-size:14px;
+    padding: 10px 16px; border-radius: 30px; z-index: 100;
+    opacity: 0; pointer-events:none; transition: opacity .2s, transform .2s;
+    box-shadow: 0 6px 24px rgba(0, 230, 118, 0.4);
+  }
+  .toast.show { opacity:1; transform: translateX(-50%) translateY(0); }
+  .toast.err { background:#ff5252; color:#3a0606; box-shadow: 0 6px 24px rgba(255,82,82,0.4); }
+
+  button { font-family: inherit; cursor: pointer; outline: none; text-transform: uppercase; }
+  button:focus-visible { outline: 2px solid #4c7bff; outline-offset: 2px; }
+  .btn-subject, .btn-item { letter-spacing: 0; }
+  .action, .sheet-actions .cancel, .sheet-actions .save { letter-spacing: 0.4px; }
+  .bd-pill, .totals-head .label, .totals-head .grand, #amountTitle, #amountSub { text-transform: uppercase; letter-spacing: 0.4px; }
+
+  @media (max-width: 360px) {
+    .btn-subject { padding: 10px 2px; font-size: 11px; }
+    .btn-item { padding: 14px 4px; font-size: 13px; min-height: 54px; }
+  }
+</style>
+</head>
+<body>
+<div class="app">
+  <div class="topbar">
+    <h1>Paarden Boekhouding</h1>
+    <button class="icon-btn" id="btnMenu" title="Menu">⋯</button>
+  </div>
+
+  <div class="subjects" id="subjects"></div>
+
+  <div class="items-grid" id="itemsGrid"></div>
+
+  <div class="totals">
+    <div class="totals-head">
+      <span class="label" id="totalsLabel">Totaal</span>
+      <span class="grand" id="grandTotal">€ 0,00</span>
+    </div>
+    <div class="item-breakdown" id="itemBreakdown"></div>
+  </div>
+
+  <div class="actions">
+    <button class="action" id="btnHistory">📋 Geschiedenis</button>
+    <button class="action primary" id="btnExport">⬇️ Excel opslaan</button>
+    <button class="action" id="btnBackup">💾 Backup nu</button>
+    <button class="action" id="btnImport">📂 Importeren</button>
+  </div>
+</div>
+
+<!-- Amount input sheet -->
+<div class="overlay" id="amountSheet">
+  <div class="sheet">
+    <h2 id="amountTitle">Bedrag</h2>
+    <span class="sub" id="amountSub"></span>
+    <div class="amount-wrap">
+      <span class="euro">€</span>
+      <input id="amount" type="number" inputmode="decimal" step="0.01" min="0" placeholder="0,00" autocomplete="off">
+    </div>
+    <input id="note" type="text" placeholder="Opmerking (optioneel)" autocomplete="off">
+    <div class="sheet-actions">
+      <button class="cancel" id="amountCancel">Annuleer</button>
+      <button class="save" id="amountSave">Opslaan</button>
+    </div>
+  </div>
+</div>
+
+<!-- History sheet -->
+<div class="overlay" id="historySheet">
+  <div class="sheet">
+    <h2>Geschiedenis</h2>
+    <span class="sub">Tik op de rode knop om een fout te verwijderen.</span>
+    <div class="history-wrap" id="historyList"></div>
+    <div class="sheet-actions">
+      <button class="cancel" id="histClose">Sluiten</button>
+      <button class="save" id="histExport">Exporteren</button>
+    </div>
+  </div>
+</div>
+
+<!-- Menu sheet -->
+<div class="overlay" id="menuSheet">
+  <div class="sheet">
+    <h2>Menu</h2>
+    <span class="sub" id="menuInfo"></span>
+    <div style="display:flex; flex-direction:column; gap:8px; margin-bottom:12px;">
+      <button class="action" id="btnBackupList">📚 Backups bekijken (<span id="backupCount">0</span>)</button>
+      <button class="action" id="btnImport2">📂 Importeer .xlsx van OneDrive</button>
+      <button class="action warn" id="btnReset">🗑️ Alles wissen</button>
+    </div>
+    <div class="sheet-actions">
+      <button class="cancel" id="menuClose">Sluiten</button>
+      <button class="save" id="menuExport">Excel opslaan</button>
+    </div>
+  </div>
+</div>
+
+<!-- Backup list sheet -->
+<div class="overlay" id="backupSheet">
+  <div class="sheet">
+    <h2>Backups op toestel</h2>
+    <span class="sub">Tik op "Herstel" om een backup terug te zetten. Huidige data wordt eerst veiliggesteld.</span>
+    <div class="history-wrap" id="backupList"></div>
+    <div class="sheet-actions">
+      <button class="cancel" id="backupClose">Sluiten</button>
+      <button class="save" id="backupNow">Backup nu</button>
+    </div>
+  </div>
+</div>
+
+<div class="toast" id="toast"></div>
+
+<input type="file" id="fileInput" accept=".xlsx,.xls,.csv" style="display:none">
+
+<script src="https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js"></script>
+<script>
+  // ============ Data ============
+  const HORSE_ITEMS = ['Smid', 'Medicatie', 'Veearts', 'Stalgeld', 'Ruiter', 'Wedstrijd', 'Getuig', 'Transport', 'Registraties'];
+  const ALG_ITEMS   = ['Voeder', 'Vitamines', 'Hooi', 'Stro', 'Vakantie', 'Stalmateriaal', 'Zangersheide/lidgeld'];
+  const SUBJECTS = [
+    { name: 'Algemeen', emoji: '📋', kind: 'general' },
+    { name: 'Muchu',    emoji: '🐴', kind: 'horse'   },
+    { name: 'Chipie',   emoji: '🐎', kind: 'horse'   },
+    { name: 'Zazou',    emoji: '🐴', kind: 'horse'   },
+    { name: 'Poupette', emoji: '🐎', kind: 'horse'   },
+  ];
+  const STORAGE_KEY = 'paarden-boekhouding-v2';
+  const LEGACY_KEY  = 'paarden-boekhouding-v1';
+  const BACKUP_KEY  = 'paarden-boekhouding-backups-v1';
+  const MAX_BACKUPS = 30;
+  const AUTO_BACKUP_INTERVAL_MS = 24 * 60 * 60 * 1000;
+
+  let state = {
+    activeSubject: SUBJECTS[0].name,
+    entries: [],
+    lastAutoBackup: 0,
+  };
+
+  // ============ Storage ============
+  function load() {
+    try {
+      let raw = localStorage.getItem(STORAGE_KEY);
+      if (!raw) {
+        // Migrate legacy v1 data if present
+        const legacy = localStorage.getItem(LEGACY_KEY);
+        if (legacy) {
+          const p = JSON.parse(legacy);
+          state.activeSubject = p.activeHorse || SUBJECTS[0].name;
+          state.entries = (p.entries || []).map(e => ({
+            id: e.id, datum: e.datum, paard: e.paard, item: e.item,
+            bedrag: e.bedrag, opmerking: e.opmerking || ''
+          }));
+          state.lastAutoBackup = p.lastAutoBackup || 0;
+          localStorage.setItem(STORAGE_KEY, JSON.stringify(state));
+          return;
+        }
+        return;
+      }
+      const parsed = JSON.parse(raw);
+      state = Object.assign(state, parsed);
+      if (!Array.isArray(state.entries)) state.entries = [];
+    } catch (e) { console.error('Load error', e); }
+  }
+  function save() {
+    localStorage.setItem(STORAGE_KEY, JSON.stringify(state));
+    maybeAutoBackup();
+  }
+
+  function getBackups() {
+    try { return JSON.parse(localStorage.getItem(BACKUP_KEY) || '[]'); } catch { return []; }
+  }
+  function setBackups(b) { localStorage.setItem(BACKUP_KEY, JSON.stringify(b)); }
+
+  function makeBackup(label) {
+    const backups = getBackups();
+    backups.unshift({
+      ts: Date.now(),
+      label: label || 'auto',
+      count: state.entries.length,
+      data: state.entries,
+    });
+    while (backups.length > MAX_BACKUPS) backups.pop();
+    setBackups(backups);
+    state.lastAutoBackup = Date.now();
+    localStorage.setItem(STORAGE_KEY, JSON.stringify(state));
+  }
+  function maybeAutoBackup() {
+    if (Date.now() - (state.lastAutoBackup || 0) > AUTO_BACKUP_INTERVAL_MS) {
+      makeBackup('auto');
+    }
+  }
+  function restoreBackup(idx) {
+    const backups = getBackups();
+    const b = backups[idx];
+    if (!b) return;
+    makeBackup('voor-herstel');
+    state.entries = b.data.slice();
+    save();
+    render();
+    toast('Backup hersteld');
+  }
+
+  // ============ Helpers ============
+  const fmt = n => '€ ' + (Number(n) || 0).toLocaleString('nl-BE', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+  const todayISO = () => {
+    const d = new Date(); const z = n => String(n).padStart(2, '0');
+    return d.getFullYear() + '-' + z(d.getMonth()+1) + '-' + z(d.getDate());
+  };
+  function uid() { return Date.now().toString(36) + Math.random().toString(36).slice(2,8); }
+  function escapeHtml(s) { return String(s).replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c])); }
+  const MONTH_NAMES = ['Januari','Februari','Maart','April','Mei','Juni','Juli','Augustus','September','Oktober','November','December'];
+  function currentMonthLabel() {
+    const d = new Date();
+    return MONTH_NAMES[d.getMonth()] + ' ' + d.getFullYear();
+  }
+  function isCurrentMonth(dateStr) {
+    if (!dateStr) return false;
+    const d = new Date();
+    const z = n => String(n).padStart(2, '0');
+    return String(dateStr).startsWith(d.getFullYear() + '-' + z(d.getMonth()+1) + '-');
+  }
+
+  function activeSubject() {
+    return SUBJECTS.find(s => s.name === state.activeSubject) || SUBJECTS[0];
+  }
+  function activeItems() {
+    return activeSubject().kind === 'horse' ? HORSE_ITEMS : ALG_ITEMS;
+  }
+
+  function toast(msg, isErr) {
+    const el = document.getElementById('toast');
+    el.textContent = msg;
+    el.classList.toggle('err', !!isErr);
+    el.classList.add('show');
+    clearTimeout(toast._t);
+    toast._t = setTimeout(() => el.classList.remove('show'), 1800);
+  }
+
+  // ============ Render ============
+  function renderSubjects() {
+    const wrap = document.getElementById('subjects');
+    wrap.innerHTML = '';
+    SUBJECTS.forEach(s => {
+      const btn = document.createElement('button');
+      const isActive = s.name === state.activeSubject;
+      btn.className = 'btn-subject' + (isActive ? ' active ' + s.kind : '');
+      btn.innerHTML = '<span class="subject-emoji">' + s.emoji + '</span>' + s.name;
+      btn.addEventListener('click', () => {
+        state.activeSubject = s.name;
+        save();
+        render();
+      });
+      wrap.appendChild(btn);
+    });
+  }
+
+  function renderItems() {
+    const wrap = document.getElementById('itemsGrid');
+    const kind = activeSubject().kind;
+    wrap.className = 'items-grid ' + kind;
+    wrap.innerHTML = '';
+    const items = activeItems();
+    items.forEach((it, idx) => {
+      const btn = document.createElement('button');
+      btn.className = 'btn-item';
+      // For Algemeen (7 items), make the last button span full width for balance
+      if (kind === 'general' && idx === items.length - 1) {
+        btn.classList.add('span-full');
+      }
+      btn.textContent = it;
+      btn.addEventListener('click', () => openAmount(it));
+      wrap.appendChild(btn);
+    });
+  }
+
+  function renderTotals() {
+    const all = state.entries.filter(e => e.paard === state.activeSubject && isCurrentMonth(e.datum));
+    const total = all.reduce((s,e) => s + Number(e.bedrag||0), 0);
+    document.getElementById('grandTotal').textContent = fmt(total);
+    document.getElementById('totalsLabel').textContent = currentMonthLabel() + ' — ' + state.activeSubject;
+
+    const items = activeItems();
+    const breakdown = items.map(it => ({
+      item: it,
+      sum: all.filter(e => e.item === it).reduce((a,e) => a + Number(e.bedrag||0), 0),
+    })).filter(x => x.sum > 0).sort((a,b) => b.sum - a.sum);
+
+    const bdEl = document.getElementById('itemBreakdown');
+    if (breakdown.length === 0) {
+      bdEl.innerHTML = '<div class="bd-empty">Nog geen invoer voor ' + escapeHtml(state.activeSubject) + ' deze maand.</div>';
+    } else {
+      bdEl.innerHTML = breakdown.map(x =>
+        '<div class="bd-pill">' + escapeHtml(x.item) + '<b>' + fmt(x.sum) + '</b></div>'
+      ).join('');
+    }
+  }
+
+  function render() {
+    renderSubjects();
+    renderItems();
+    renderTotals();
+  }
+
+  // ============ Entry input ============
+  let pendingItem = null;
+  function openAmount(item) {
+    pendingItem = item;
+    document.getElementById('amountTitle').textContent = item;
+    document.getElementById('amountSub').textContent = state.activeSubject;
+    document.getElementById('amount').value = '';
+    document.getElementById('note').value = '';
+    document.getElementById('amountSheet').classList.add('show');
+    setTimeout(() => document.getElementById('amount').focus(), 60);
+  }
+  function closeAmount() {
+    document.getElementById('amountSheet').classList.remove('show');
+    pendingItem = null;
+  }
+  function saveAmount() {
+    if (!pendingItem) return;
+    const raw = document.getElementById('amount').value.replace(',', '.').trim();
+    const bedrag = parseFloat(raw);
+    if (!isFinite(bedrag) || bedrag <= 0) { toast('Ongeldig bedrag', true); return; }
+    const entry = {
+      id: uid(),
+      datum: todayISO(),
+      paard: state.activeSubject,
+      item: pendingItem,
+      bedrag: Math.round(bedrag * 100) / 100,
+      opmerking: document.getElementById('note').value.trim() || '',
+    };
+    state.entries.push(entry);
+    save();
+    closeAmount();
+    renderTotals();
+    toast(fmt(bedrag) + ' bij ' + entry.item);
+  }
+
+  // ============ History ============
+  function renderHistory() {
+    const list = document.getElementById('historyList');
+    list.innerHTML = '';
+    const items = state.entries.slice().reverse();
+    if (items.length === 0) {
+      list.innerHTML = '<div class="hist-empty">Nog geen invoer.</div>';
+      return;
+    }
+    items.forEach(e => {
+      const row = document.createElement('div');
+      row.className = 'hist-row';
+      row.innerHTML = `
+        <div>
+          <div class="date">${escapeHtml(e.datum)}</div>
+          <div style="color:#fff;font-weight:600;">${escapeHtml(e.paard)}</div>
+        </div>
+        <div class="what">${escapeHtml(e.item)}${e.opmerking ? '<div style="color:#777;font-size:11px;">'+escapeHtml(e.opmerking)+'</div>' : ''}</div>
+        <div class="amt">${fmt(e.bedrag)}</div>
+        <button class="del" data-id="${e.id}" title="Verwijder">×</button>
+      `;
+      list.appendChild(row);
+    });
+    list.querySelectorAll('.del').forEach(b => {
+      b.addEventListener('click', () => {
+        const id = b.getAttribute('data-id');
+        state.entries = state.entries.filter(e => e.id !== id);
+        save(); renderTotals(); renderHistory();
+        toast('Verwijderd');
+      });
+    });
+  }
+
+  // ============ Backups ============
+  function renderBackups() {
+    const list = document.getElementById('backupList');
+    const backups = getBackups();
+    document.getElementById('backupCount').textContent = backups.length;
+    list.innerHTML = '';
+    if (backups.length === 0) {
+      list.innerHTML = '<div class="hist-empty">Nog geen backups.</div>';
+      return;
+    }
+    backups.forEach((b, i) => {
+      const d = new Date(b.ts);
+      const row = document.createElement('div');
+      row.className = 'hist-row';
+      row.style.gridTemplateColumns = '1fr auto';
+      row.innerHTML = `
+        <div>
+          <div class="date">${d.toLocaleString('nl-BE')}</div>
+          <div style="color:#fff;font-weight:600;">${escapeHtml(b.label)} — ${b.count} regels</div>
+        </div>
+        <button class="action" style="padding:8px 12px;font-size:13px;" data-i="${i}">Herstel</button>
+      `;
+      list.appendChild(row);
+    });
+    list.querySelectorAll('button[data-i]').forEach(b => {
+      b.addEventListener('click', () => {
+        if (confirm('Deze backup herstellen? Huidige data wordt eerst veiliggesteld.')) {
+          restoreBackup(Number(b.getAttribute('data-i')));
+          document.getElementById('backupSheet').classList.remove('show');
+        }
+      });
+    });
+  }
+
+  // ============ Excel export / import ============
+  function buildWorkbook() {
+    const wb = XLSX.utils.book_new();
+
+    // Sheet 1: Invoer
+    const rows = state.entries.map(e => ({
+      Datum: e.datum,
+      Paard: e.paard,
+      Item: e.item,
+      Bedrag: e.bedrag,
+      Opmerking: e.opmerking || '',
+    }));
+    const ws1 = XLSX.utils.json_to_sheet(rows, { header: ['Datum','Paard','Item','Bedrag','Opmerking'] });
+    ws1['!cols'] = [{wch:12},{wch:14},{wch:24},{wch:10},{wch:32}];
+    XLSX.utils.book_append_sheet(wb, ws1, 'Invoer');
+
+    // Sheet 2: Per paard (rows = horses, cols = horse items + TOTAAL)
+    const horseNames = SUBJECTS.filter(s => s.kind === 'horse').map(s => s.name);
+    const header1 = ['Paard', ...HORSE_ITEMS, 'TOTAAL'];
+    const data1 = [header1];
+    horseNames.forEach(name => {
+      const row = [name];
+      let total = 0;
+      HORSE_ITEMS.forEach(it => {
+        const s = state.entries
+          .filter(e => e.paard === name && e.item === it)
+          .reduce((a,e) => a + Number(e.bedrag||0), 0);
+        row.push(s);
+        total += s;
+      });
+      row.push(total);
+      data1.push(row);
+    });
+    const tot1 = ['TOTAAL'];
+    for (let c = 1; c < header1.length; c++) {
+      let s = 0;
+      for (let r = 1; r < data1.length; r++) s += Number(data1[r][c]||0);
+      tot1.push(s);
+    }
+    data1.push(tot1);
+    const ws2 = XLSX.utils.aoa_to_sheet(data1);
+    ws2['!cols'] = header1.map((h,i) => ({ wch: i===0 ? 12 : Math.max(10, h.length+2) }));
+    XLSX.utils.book_append_sheet(wb, ws2, 'Per paard');
+
+    // Sheet 3: Algemeen (rows = items, col = bedrag)
+    const data2 = [['Item', 'Bedrag']];
+    let algTotal = 0;
+    ALG_ITEMS.forEach(it => {
+      const s = state.entries
+        .filter(e => e.paard === 'Algemeen' && e.item === it)
+        .reduce((a,e) => a + Number(e.bedrag||0), 0);
+      data2.push([it, s]);
+      algTotal += s;
+    });
+    data2.push(['TOTAAL', algTotal]);
+    const ws3 = XLSX.utils.aoa_to_sheet(data2);
+    ws3['!cols'] = [{wch:26},{wch:12}];
+    XLSX.utils.book_append_sheet(wb, ws3, 'Algemeen');
+
+    // Sheet 4: Eindtotalen (per paard + Algemeen + Grand)
+    const data3 = [['Onderwerp', 'Totaal']];
+    let grand = 0;
+    horseNames.forEach(name => {
+      const s = state.entries.filter(e => e.paard === name).reduce((a,e) => a + Number(e.bedrag||0), 0);
+      data3.push([name, s]); grand += s;
+    });
+    const algSum = state.entries.filter(e => e.paard === 'Algemeen').reduce((a,e) => a + Number(e.bedrag||0), 0);
+    data3.push(['Algemeen', algSum]); grand += algSum;
+    data3.push(['GRAND TOTAAL', grand]);
+    const ws4 = XLSX.utils.aoa_to_sheet(data3);
+    ws4['!cols'] = [{wch:18},{wch:14}];
+    XLSX.utils.book_append_sheet(wb, ws4, 'Eindtotalen');
+
+    return wb;
+  }
+
+  function exportExcel() {
+    const wb = buildWorkbook();
+    XLSX.writeFile(wb, 'paarden-boekhouding.xlsx');
+    toast('Excel gemaakt — sla op in OneDrive');
+  }
+
+  function importExcel(file) {
+    const reader = new FileReader();
+    reader.onload = (ev) => {
+      try {
+        const wb = XLSX.read(ev.target.result, { type: 'array' });
+        const ws = wb.Sheets['Invoer'] || wb.Sheets[wb.SheetNames[0]];
+        const rows = XLSX.utils.sheet_to_json(ws);
+        if (!confirm('Importeer ' + rows.length + ' regels? Huidige data wordt eerst gebackupt.')) return;
+        makeBackup('voor-import');
+        const imported = rows.map(r => ({
+          id: uid(),
+          datum: String(r.Datum || r.datum || todayISO()).slice(0,10),
+          paard: String(r.Paard || r.paard || '').trim(),
+          item: String(r.Item || r.item || '').trim(),
+          bedrag: Number(String(r.Bedrag ?? r.bedrag ?? 0).toString().replace(',','.')) || 0,
+          opmerking: String(r.Opmerking || r.opmerking || ''),
+        })).filter(e => e.paard && e.item && e.bedrag > 0);
+        state.entries = imported;
+        save();
+        render();
+        toast('Geïmporteerd: ' + imported.length + ' regels');
+      } catch (e) {
+        console.error(e);
+        toast('Importeren mislukt', true);
+      }
+    };
+    reader.readAsArrayBuffer(file);
+  }
+
+  // ============ Wire-up ============
+  function init() {
+    load();
+    render();
+
+    document.getElementById('amountCancel').addEventListener('click', closeAmount);
+    document.getElementById('amountSave').addEventListener('click', saveAmount);
+    document.getElementById('amount').addEventListener('keydown', e => {
+      if (e.key === 'Enter') saveAmount();
+    });
+
+    document.getElementById('btnHistory').addEventListener('click', () => {
+      renderHistory();
+      document.getElementById('historySheet').classList.add('show');
+    });
+    document.getElementById('histClose').addEventListener('click', () => document.getElementById('historySheet').classList.remove('show'));
+    document.getElementById('histExport').addEventListener('click', exportExcel);
+
+    document.getElementById('btnExport').addEventListener('click', exportExcel);
+    document.getElementById('btnBackup').addEventListener('click', () => {
+      makeBackup('handmatig');
+      toast('Backup gemaakt');
+    });
+    document.getElementById('btnImport').addEventListener('click', () => document.getElementById('fileInput').click());
+    document.getElementById('btnImport2').addEventListener('click', () => document.getElementById('fileInput').click());
+    document.getElementById('fileInput').addEventListener('change', e => {
+      if (e.target.files[0]) importExcel(e.target.files[0]);
+      e.target.value = '';
+      document.getElementById('menuSheet').classList.remove('show');
+    });
+
+    document.getElementById('btnMenu').addEventListener('click', () => {
+      const b = getBackups();
+      document.getElementById('backupCount').textContent = b.length;
+      const last = b[0] ? new Date(b[0].ts).toLocaleString('nl-BE') : 'nog geen';
+      document.getElementById('menuInfo').textContent = state.entries.length + ' regels · laatste backup: ' + last;
+      document.getElementById('menuSheet').classList.add('show');
+    });
+    document.getElementById('menuClose').addEventListener('click', () => document.getElementById('menuSheet').classList.remove('show'));
+    document.getElementById('menuExport').addEventListener('click', exportExcel);
+
+    document.getElementById('btnBackupList').addEventListener('click', () => {
+      renderBackups();
+      document.getElementById('menuSheet').classList.remove('show');
+      document.getElementById('backupSheet').classList.add('show');
+    });
+    document.getElementById('backupClose').addEventListener('click', () => document.getElementById('backupSheet').classList.remove('show'));
+    document.getElementById('backupNow').addEventListener('click', () => {
+      makeBackup('handmatig');
+      renderBackups();
+      toast('Backup gemaakt');
+    });
+
+    document.getElementById('btnReset').addEventListener('click', () => {
+      if (!confirm('Alles wissen? Er wordt eerst een backup gemaakt.')) return;
+      makeBackup('voor-reset');
+      state.entries = [];
+      save();
+      render();
+      document.getElementById('menuSheet').classList.remove('show');
+      toast('Alles gewist');
+    });
+
+    ['amountSheet','historySheet','menuSheet','backupSheet'].forEach(id => {
+      const el = document.getElementById(id);
+      el.addEventListener('click', e => { if (e.target === el) el.classList.remove('show'); });
+    });
+
+    maybeAutoBackup();
+  }
+
+  if (document.readyState === 'loading') {
+    document.addEventListener('DOMContentLoaded', init);
+  } else {
+    init();
+  }
+</script>
+</body>
+</html>
