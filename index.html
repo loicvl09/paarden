@@ -553,74 +553,129 @@
   // ============ Excel export / import ============
   function buildWorkbook() {
     const wb = XLSX.utils.book_new();
+    const horseNames = SUBJECTS.filter(s => s.kind === 'horse').map(s => s.name);
+    const HORSES_COUNT = horseNames.length || 4;
 
-    // Sheet 1: Invoer
-    const rows = state.entries.map(e => ({
-      Datum: e.datum,
-      Paard: e.paard,
-      Item: e.item,
-      Bedrag: e.bedrag,
-      Opmerking: e.opmerking || '',
-    }));
-    const ws1 = XLSX.utils.json_to_sheet(rows, { header: ['Datum','Paard','Item','Bedrag','Opmerking'] });
+    // ---- Sheet 1: Invoer (chronologische log, datum altijd aanwezig)
+    const invoerRows = state.entries
+      .slice()
+      .sort((a,b) => String(a.datum).localeCompare(String(b.datum)))
+      .map(e => ({
+        Datum: e.datum,
+        Paard: e.paard,
+        Item: e.item,
+        Bedrag: e.bedrag,
+        Opmerking: e.opmerking || '',
+      }));
+    const ws1 = XLSX.utils.json_to_sheet(invoerRows, { header: ['Datum','Paard','Item','Bedrag','Opmerking'] });
     ws1['!cols'] = [{wch:12},{wch:14},{wch:24},{wch:10},{wch:32}];
     XLSX.utils.book_append_sheet(wb, ws1, 'Invoer');
 
-    // Sheet 2: Per paard (rows = horses, cols = horse items + TOTAAL)
-    const horseNames = SUBJECTS.filter(s => s.kind === 'horse').map(s => s.name);
-    const header1 = ['Paard', ...HORSE_ITEMS, 'TOTAAL'];
-    const data1 = [header1];
-    horseNames.forEach(name => {
-      const row = [name];
-      let total = 0;
-      HORSE_ITEMS.forEach(it => {
-        const s = state.entries
-          .filter(e => e.paard === name && e.item === it)
-          .reduce((a,e) => a + Number(e.bedrag||0), 0);
-        row.push(s);
-        total += s;
-      });
-      row.push(total);
-      data1.push(row);
-    });
-    const tot1 = ['TOTAAL'];
-    for (let c = 1; c < header1.length; c++) {
-      let s = 0;
-      for (let r = 1; r < data1.length; r++) s += Number(data1[r][c]||0);
-      tot1.push(s);
+    // ---- Period helpers
+    function uniqueMonths() {
+      const s = new Set();
+      state.entries.forEach(e => { const ym = String(e.datum||'').slice(0,7); if (ym.length === 7) s.add(ym); });
+      return Array.from(s).sort().reverse(); // newest first
     }
-    data1.push(tot1);
-    const ws2 = XLSX.utils.aoa_to_sheet(data1);
-    ws2['!cols'] = header1.map((h,i) => ({ wch: i===0 ? 12 : Math.max(10, h.length+2) }));
+    function uniqueYears() {
+      const s = new Set();
+      state.entries.forEach(e => { const y = String(e.datum||'').slice(0,4); if (y.length === 4) s.add(y); });
+      return Array.from(s).sort().reverse();
+    }
+    function monthLabel(ym) {
+      const [y, m] = ym.split('-');
+      return MONTH_NAMES[parseInt(m,10)-1].toUpperCase() + ' ' + y;
+    }
+    const months = uniqueMonths();
+    const years  = uniqueYears();
+
+    // ---- Sheet 2: Per paard (per maand + per jaar, met Algemeen/4 aandeel)
+    const perPaardRows = [];
+    function appendHorseTable(periodLabel, filterFn) {
+      perPaardRows.push([periodLabel]);
+      perPaardRows.push(['Paard', ...HORSE_ITEMS, 'TOTAAL eigen', 'Aandeel Algemeen (÷' + HORSES_COUNT + ')', 'TOTAAL incl. Algemeen']);
+      const algTotal = state.entries
+        .filter(e => e.paard === 'Algemeen' && filterFn(e))
+        .reduce((a,e) => a + Number(e.bedrag||0), 0);
+      const algShare = algTotal / HORSES_COUNT;
+      const colSums = HORSE_ITEMS.map(() => 0);
+      let totOwn = 0, totIncl = 0;
+      horseNames.forEach(name => {
+        const row = [name];
+        let own = 0;
+        HORSE_ITEMS.forEach((it, idx) => {
+          const s = state.entries
+            .filter(e => e.paard === name && e.item === it && filterFn(e))
+            .reduce((a,e) => a + Number(e.bedrag||0), 0);
+          row.push(s); own += s; colSums[idx] += s;
+        });
+        row.push(own); row.push(algShare); row.push(own + algShare);
+        totOwn += own; totIncl += own + algShare;
+        perPaardRows.push(row);
+      });
+      perPaardRows.push(['TOTAAL', ...colSums, totOwn, algTotal, totIncl]);
+      perPaardRows.push([]);
+    }
+    months.forEach(ym => appendHorseTable(monthLabel(ym), e => String(e.datum).startsWith(ym)));
+    years.forEach(y  => appendHorseTable('JAAR ' + y,    e => String(e.datum).startsWith(y)));
+    if (state.entries.length > 0) appendHorseTable('ALL TIME', () => true);
+    if (perPaardRows.length === 0) perPaardRows.push(['Nog geen invoer.']);
+    const ws2 = XLSX.utils.aoa_to_sheet(perPaardRows);
+    ws2['!cols'] = [{wch:14}, ...HORSE_ITEMS.map(() => ({wch:12})), {wch:14}, {wch:22}, {wch:22}];
     XLSX.utils.book_append_sheet(wb, ws2, 'Per paard');
 
-    // Sheet 3: Algemeen (rows = items, col = bedrag)
-    const data2 = [['Item', 'Bedrag']];
-    let algTotal = 0;
-    ALG_ITEMS.forEach(it => {
-      const s = state.entries
-        .filter(e => e.paard === 'Algemeen' && e.item === it)
-        .reduce((a,e) => a + Number(e.bedrag||0), 0);
-      data2.push([it, s]);
-      algTotal += s;
-    });
-    data2.push(['TOTAAL', algTotal]);
-    const ws3 = XLSX.utils.aoa_to_sheet(data2);
-    ws3['!cols'] = [{wch:26},{wch:12}];
+    // ---- Sheet 3: Algemeen (per maand + per jaar, met aandeel per paard)
+    const algRows = [];
+    function appendAlgTable(periodLabel, filterFn) {
+      algRows.push([periodLabel]);
+      algRows.push(['Item', 'Bedrag', 'Aandeel per paard (÷' + HORSES_COUNT + ')']);
+      let total = 0;
+      ALG_ITEMS.forEach(it => {
+        const s = state.entries
+          .filter(e => e.paard === 'Algemeen' && e.item === it && filterFn(e))
+          .reduce((a,e) => a + Number(e.bedrag||0), 0);
+        algRows.push([it, s, s/HORSES_COUNT]);
+        total += s;
+      });
+      algRows.push(['TOTAAL', total, total/HORSES_COUNT]);
+      algRows.push([]);
+    }
+    months.forEach(ym => appendAlgTable(monthLabel(ym), e => String(e.datum).startsWith(ym)));
+    years.forEach(y  => appendAlgTable('JAAR ' + y,    e => String(e.datum).startsWith(y)));
+    if (state.entries.length > 0) appendAlgTable('ALL TIME', () => true);
+    if (algRows.length === 0) algRows.push(['Nog geen invoer.']);
+    const ws3 = XLSX.utils.aoa_to_sheet(algRows);
+    ws3['!cols'] = [{wch:26},{wch:14},{wch:24}];
     XLSX.utils.book_append_sheet(wb, ws3, 'Algemeen');
 
-    // Sheet 4: Eindtotalen (per paard + Algemeen + Grand)
-    const data3 = [['Onderwerp', 'Totaal']];
-    let grand = 0;
-    horseNames.forEach(name => {
-      const s = state.entries.filter(e => e.paard === name).reduce((a,e) => a + Number(e.bedrag||0), 0);
-      data3.push([name, s]); grand += s;
-    });
-    const algSum = state.entries.filter(e => e.paard === 'Algemeen').reduce((a,e) => a + Number(e.bedrag||0), 0);
-    data3.push(['Algemeen', algSum]); grand += algSum;
-    data3.push(['GRAND TOTAAL', grand]);
-    const ws4 = XLSX.utils.aoa_to_sheet(data3);
-    ws4['!cols'] = [{wch:18},{wch:14}];
+    // ---- Sheet 4: Eindtotalen (per periode, per paard incl. Algemeen-aandeel)
+    const eindRows = [];
+    function appendEindTable(periodLabel, filterFn) {
+      eindRows.push([periodLabel]);
+      eindRows.push(['Onderwerp', 'Eigen', 'Aandeel Algemeen', 'TOTAAL incl. Algemeen']);
+      const algTotal = state.entries
+        .filter(e => e.paard === 'Algemeen' && filterFn(e))
+        .reduce((a,e) => a + Number(e.bedrag||0), 0);
+      const algShare = algTotal / HORSES_COUNT;
+      let grand = 0;
+      horseNames.forEach(name => {
+        const own = state.entries
+          .filter(e => e.paard === name && filterFn(e))
+          .reduce((a,e) => a + Number(e.bedrag||0), 0);
+        const incl = own + algShare;
+        eindRows.push([name, own, algShare, incl]);
+        grand += incl;
+      });
+      eindRows.push(['Algemeen (totaal)', algTotal, '', algTotal]);
+      eindRows.push(['GRAND TOTAAL alles', '', '', grand]);
+      eindRows.push([]);
+    }
+    months.forEach(ym => appendEindTable(monthLabel(ym), e => String(e.datum).startsWith(ym)));
+    years.forEach(y  => appendEindTable('JAAR ' + y,    e => String(e.datum).startsWith(y)));
+    if (state.entries.length > 0) appendEindTable('ALL TIME', () => true);
+    if (eindRows.length === 0) eindRows.push(['Nog geen invoer.']);
+    const ws4 = XLSX.utils.aoa_to_sheet(eindRows);
+    ws4['!cols'] = [{wch:24},{wch:14},{wch:18},{wch:22}];
     XLSX.utils.book_append_sheet(wb, ws4, 'Eindtotalen');
 
     return wb;
