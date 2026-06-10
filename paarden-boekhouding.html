@@ -356,7 +356,7 @@
     { name: 'Chipie',   emoji: '🐎', kind: 'horse'   },
     { name: 'Zazou',    emoji: '🐴', kind: 'horse'   },
     { name: 'Poupette', emoji: '🐎', kind: 'horse'   },
-    { name: 'Extra',    emoji: '✨', kind: 'extra'   },
+    { name: 'Extra',    emoji: '➕', kind: 'extra'   },
   ];
   // Subjects available as targets in the "Andere kosten" modal
   const DIVERSE_TARGETS = ['Algemeen', 'Muchu', 'Chipie', 'Zazou', 'Poupette'];
@@ -624,7 +624,7 @@
     if (kind === 'extra') {
       const btn = document.createElement('button');
       btn.className = 'btn-andere-kosten';
-      btn.textContent = '✨ Andere kosten';
+      btn.textContent = 'Andere kosten';
       btn.addEventListener('click', openExtra);
       wrap.appendChild(btn);
       return;
