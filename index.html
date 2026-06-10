@@ -41,8 +41,8 @@
   .sync-dot.pending { background:#ff9800; box-shadow: 0 0 8px rgba(255,152,0,0.6); }
   @keyframes syncpulse { 0%,100% { opacity:1; } 50% { opacity:0.35; } }
 
-  /* Subjects (4 horses + Algemeen) */
-  .subjects { display:grid; grid-template-columns: repeat(5, 1fr); gap:5px; margin-bottom: 12px; }
+  /* Subjects (Algemeen + 4 horses + Extra) */
+  .subjects { display:grid; grid-template-columns: repeat(6, 1fr); gap:4px; margin-bottom: 12px; }
   .btn-subject {
     background:#111; color:#aaa; border:2px solid #222;
     padding: 12px 0; border-radius: 12px; font-weight:700; font-size: 10px;
@@ -63,7 +63,13 @@
     border-color: #ffd47a;
     box-shadow: 0 0 18px rgba(255, 179, 0, 0.45);
   }
-  .subject-emoji { display:block; font-size: 16px; margin-bottom: 2px; }
+  .btn-subject.active.extra {
+    color:#fff;
+    background: linear-gradient(180deg, #c84cff 0%, #6a1a9a 100%);
+    border-color: #d97aff;
+    box-shadow: 0 0 18px rgba(200, 76, 255, 0.5);
+  }
+  .subject-emoji { display:block; font-size: 14px; margin-bottom: 2px; }
 
   /* Items grid (changes with active subject) */
   .items-grid {
@@ -77,6 +83,28 @@
   .items-grid.general {
     background: linear-gradient(180deg, #ffb300 0%, #855a00 70%, #322000 95%, #1b1300 100%);
   }
+  .items-grid.extra {
+    background: linear-gradient(180deg, #c84cff 0%, #6a1a9a 60%, #2a0a3d 92%, #14021f 100%);
+    min-height: 220px;
+    align-items: center;
+    justify-items: center;
+  }
+  .btn-andere-kosten {
+    grid-column: 1 / -1;
+    background: rgba(0,0,0,0.45);
+    color: #fff;
+    border: 2px solid rgba(255,255,255,0.45);
+    padding: 36px 18px;
+    border-radius: 18px;
+    font-weight: 800;
+    font-size: 18px;
+    letter-spacing: 1px;
+    width: 100%;
+    text-transform: uppercase;
+    -webkit-backdrop-filter: blur(4px); backdrop-filter: blur(4px);
+    transition: transform .08s ease, background .15s;
+  }
+  .btn-andere-kosten:active { transform: scale(0.97); background: rgba(0,0,0,0.65); }
   .btn-item {
     background: rgba(0,0,0,0.42);
     color: #fff;
@@ -148,6 +176,27 @@
   .sheet-actions { display:grid; grid-template-columns: 1fr 1fr; gap:8px; }
   .sheet-actions .cancel { background:#1a1a1a; border:1px solid #2a2a2a; color:#ccc; padding:14px; border-radius:14px; font-weight:600; }
   .sheet-actions .save { background: linear-gradient(180deg, #00e676 0%, #06a851 100%); color:#03210e; padding:14px; border-radius:14px; font-weight:800; font-size:15px; border:none; }
+
+  /* Diverse kosten modal */
+  .target-chips { display:grid; grid-template-columns: repeat(5, 1fr); gap:5px; margin-bottom:12px; }
+  .chip-target {
+    background:#1a1a1a; border:2px solid #2a2a2a; color:#bbb;
+    padding: 12px 2px; border-radius: 10px; font-weight:700; font-size:11px;
+    text-align:center; text-transform: uppercase; letter-spacing: 0;
+  }
+  .chip-target:active { transform: scale(0.96); }
+  .chip-target.active {
+    background: linear-gradient(180deg, #c84cff 0%, #6a1a9a 100%);
+    border-color: #d97aff; color:#fff;
+    box-shadow: 0 0 10px rgba(200,76,255,0.45);
+  }
+  #extraDesc {
+    width:100%; background:#151515; border:2px solid #2a2a2a; color:#fff;
+    font-size:15px; padding:14px; border-radius:12px; outline:none; margin-bottom:10px;
+    -webkit-appearance:none;
+  }
+  #extraDesc:focus { border-color:#c84cff; }
+  #extraDesc.err, #extraAmount.err { border-color:#ff5252; }
 
   /* History */
   .history-wrap { max-height: 60vh; overflow-y: auto; -webkit-overflow-scrolling: touch; margin: 4px -4px 14px; }
@@ -228,6 +277,24 @@
   </div>
 </div>
 
+<!-- Diverse kosten (Andere kosten) sheet -->
+<div class="overlay" id="extraSheet">
+  <div class="sheet">
+    <h2>Andere kosten</h2>
+    <span class="sub">Bij wie hoort deze kost?</span>
+    <div class="target-chips" id="extraTargets"></div>
+    <input id="extraDesc" type="text" placeholder="Beschrijving (verplicht)" autocomplete="off" maxlength="80">
+    <div class="amount-wrap">
+      <span class="euro">€</span>
+      <input id="extraAmount" type="number" inputmode="decimal" step="0.01" min="0" placeholder="0,00" autocomplete="off">
+    </div>
+    <div class="sheet-actions">
+      <button class="cancel" id="extraCancel">Annuleer</button>
+      <button class="save" id="extraSave">Opslaan</button>
+    </div>
+  </div>
+</div>
+
 <!-- History sheet -->
 <div class="overlay" id="historySheet">
   <div class="sheet">
@@ -278,15 +345,21 @@
 <script src="https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js"></script>
 <script>
   // ============ Data ============
-  const HORSE_ITEMS = ['Smid', 'Medicatie', 'Veearts', 'Stalgeld', 'Ruiter', 'Wedstrijd', 'Getuig', 'Transport', 'Registraties'];
-  const ALG_ITEMS   = ['Voeder', 'Vitamines', 'Hooi', 'Stro', 'Vakantie', 'Stalmateriaal', 'Zangersheide/lidgeld'];
+  const HORSE_ITEMS = ['Smid', 'Medicatie', 'Veearts', 'Stalgeld', 'Ruiter', 'Wedstrijd', 'Getuig', 'Transport', 'Registraties', 'Diverse kosten'];
+  const ALG_ITEMS   = ['Voeder', 'Vitamines', 'Hooi', 'Stro', 'Vakantie', 'Stalmateriaal', 'Zangersheide/lidgeld', 'Diverse kosten'];
+  // Items shown as buttons on horse/algemeen pages (Diverse kosten is hidden, only via EXTRA page)
+  const HORSE_BUTTONS = HORSE_ITEMS.filter(i => i !== 'Diverse kosten');
+  const ALG_BUTTONS   = ALG_ITEMS.filter(i => i !== 'Diverse kosten');
   const SUBJECTS = [
     { name: 'Algemeen', emoji: '📋', kind: 'general' },
     { name: 'Muchu',    emoji: '🐴', kind: 'horse'   },
     { name: 'Chipie',   emoji: '🐎', kind: 'horse'   },
     { name: 'Zazou',    emoji: '🐴', kind: 'horse'   },
     { name: 'Poupette', emoji: '🐎', kind: 'horse'   },
+    { name: 'Extra',    emoji: '✨', kind: 'extra'   },
   ];
+  // Subjects available as targets in the "Andere kosten" modal
+  const DIVERSE_TARGETS = ['Algemeen', 'Muchu', 'Chipie', 'Zazou', 'Poupette'];
   const STORAGE_KEY = 'paarden-boekhouding-v2';
   const LEGACY_KEY  = 'paarden-boekhouding-v1';
   const BACKUP_KEY  = 'paarden-boekhouding-backups-v1';
@@ -393,7 +466,14 @@
     return SUBJECTS.find(s => s.name === state.activeSubject) || SUBJECTS[0];
   }
   function activeItems() {
+    // For totals breakdown (includes Diverse kosten if present)
     return activeSubject().kind === 'horse' ? HORSE_ITEMS : ALG_ITEMS;
+  }
+  function activeButtons() {
+    // Buttons shown on the page
+    if (activeSubject().kind === 'horse') return HORSE_BUTTONS;
+    if (activeSubject().kind === 'general') return ALG_BUTTONS;
+    return [];  // extra page renders its own button
   }
 
   function toast(msg, isErr) {
@@ -541,7 +621,15 @@
     const kind = activeSubject().kind;
     wrap.className = 'items-grid ' + kind;
     wrap.innerHTML = '';
-    const items = activeItems();
+    if (kind === 'extra') {
+      const btn = document.createElement('button');
+      btn.className = 'btn-andere-kosten';
+      btn.textContent = '✨ Andere kosten';
+      btn.addEventListener('click', openExtra);
+      wrap.appendChild(btn);
+      return;
+    }
+    const items = activeButtons();
     items.forEach((it, idx) => {
       const btn = document.createElement('button');
       btn.className = 'btn-item';
@@ -556,10 +644,31 @@
   }
 
   function renderTotals() {
+    const bdEl = document.getElementById('itemBreakdown');
+    const totalsLabel = document.getElementById('totalsLabel');
+    const grand = document.getElementById('grandTotal');
+
+    if (activeSubject().kind === 'extra') {
+      // Summary of all "Diverse kosten" this month, grouped by paard
+      const all = state.entries.filter(e => e.item === 'Diverse kosten' && isCurrentMonth(e.datum));
+      const total = all.reduce((s,e) => s + Number(e.bedrag||0), 0);
+      grand.textContent = fmt(total);
+      totalsLabel.textContent = currentMonthLabel() + ' — Diverse kosten';
+      const byPaard = {};
+      all.forEach(e => { byPaard[e.paard] = (byPaard[e.paard]||0) + Number(e.bedrag||0); });
+      const bd = Object.entries(byPaard).map(([p,sum]) => ({item:p, sum})).filter(x => x.sum > 0).sort((a,b)=>b.sum-a.sum);
+      if (bd.length === 0) {
+        bdEl.innerHTML = '<div class="bd-empty">Nog geen diverse kosten deze maand.</div>';
+      } else {
+        bdEl.innerHTML = bd.map(x => '<div class="bd-pill">' + escapeHtml(x.item) + '<b>' + fmt(x.sum) + '</b></div>').join('');
+      }
+      return;
+    }
+
     const all = state.entries.filter(e => e.paard === state.activeSubject && isCurrentMonth(e.datum));
     const total = all.reduce((s,e) => s + Number(e.bedrag||0), 0);
-    document.getElementById('grandTotal').textContent = fmt(total);
-    document.getElementById('totalsLabel').textContent = currentMonthLabel() + ' — ' + state.activeSubject;
+    grand.textContent = fmt(total);
+    totalsLabel.textContent = currentMonthLabel() + ' — ' + state.activeSubject;
 
     const items = activeItems();
     const breakdown = items.map(it => ({
@@ -567,7 +676,6 @@
       sum: all.filter(e => e.item === it).reduce((a,e) => a + Number(e.bedrag||0), 0),
     })).filter(x => x.sum > 0).sort((a,b) => b.sum - a.sum);
 
-    const bdEl = document.getElementById('itemBreakdown');
     if (breakdown.length === 0) {
       bdEl.innerHTML = '<div class="bd-empty">Nog geen invoer voor ' + escapeHtml(state.activeSubject) + ' deze maand.</div>';
     } else {
@@ -616,6 +724,56 @@
     closeAmount();
     renderTotals();
     toast(fmt(bedrag) + ' bij ' + entry.item);
+    pushToSheet({ action: 'add', entry });
+  }
+
+  // ============ Andere kosten (Diverse kosten) ============
+  let extraTarget = 'Algemeen';
+  function renderExtraTargets() {
+    const wrap = document.getElementById('extraTargets');
+    wrap.innerHTML = '';
+    DIVERSE_TARGETS.forEach(name => {
+      const b = document.createElement('button');
+      b.className = 'chip-target' + (name === extraTarget ? ' active' : '');
+      b.textContent = name;
+      b.addEventListener('click', () => { extraTarget = name; renderExtraTargets(); });
+      wrap.appendChild(b);
+    });
+  }
+  function openExtra() {
+    extraTarget = 'Algemeen';
+    document.getElementById('extraDesc').value = '';
+    document.getElementById('extraAmount').value = '';
+    document.getElementById('extraDesc').classList.remove('err');
+    document.getElementById('extraAmount').classList.remove('err');
+    renderExtraTargets();
+    document.getElementById('extraSheet').classList.add('show');
+    setTimeout(() => document.getElementById('extraDesc').focus(), 60);
+  }
+  function closeExtra() { document.getElementById('extraSheet').classList.remove('show'); }
+  function saveExtra() {
+    const descEl = document.getElementById('extraDesc');
+    const amtEl = document.getElementById('extraAmount');
+    const desc = descEl.value.trim();
+    const raw = amtEl.value.replace(',', '.').trim();
+    const bedrag = parseFloat(raw);
+    let ok = true;
+    if (!desc) { descEl.classList.add('err'); ok = false; } else descEl.classList.remove('err');
+    if (!isFinite(bedrag) || bedrag <= 0) { amtEl.classList.add('err'); ok = false; } else amtEl.classList.remove('err');
+    if (!ok) { toast('Beschrijving en bedrag verplicht', true); return; }
+    const entry = {
+      id: uid(),
+      datum: todayISO(),
+      paard: extraTarget,
+      item: 'Diverse kosten',
+      bedrag: Math.round(bedrag * 100) / 100,
+      opmerking: desc,
+    };
+    state.entries.push(entry);
+    save();
+    closeExtra();
+    renderTotals();
+    toast(fmt(bedrag) + ' · ' + extraTarget);
     pushToSheet({ action: 'add', entry });
   }
 
@@ -880,6 +1038,12 @@
       if (e.key === 'Enter') saveAmount();
     });
 
+    document.getElementById('extraCancel').addEventListener('click', closeExtra);
+    document.getElementById('extraSave').addEventListener('click', saveExtra);
+    document.getElementById('extraAmount').addEventListener('keydown', e => {
+      if (e.key === 'Enter') saveExtra();
+    });
+
     document.getElementById('btnHistory').addEventListener('click', () => {
       renderHistory();
       document.getElementById('historySheet').classList.add('show');
@@ -933,7 +1097,7 @@
       pushToSheet({ action: 'replace', entries: [] });
     });
 
-    ['amountSheet','historySheet','menuSheet','backupSheet'].forEach(id => {
+    ['amountSheet','extraSheet','historySheet','menuSheet','backupSheet'].forEach(id => {
       const el = document.getElementById(id);
       el.addEventListener('click', e => { if (e.target === el) el.classList.remove('show'); });
     });
