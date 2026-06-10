@@ -162,12 +162,18 @@
   .sheet .sub { color:#888; font-size:13px; margin-left:4px; margin-bottom:10px; display:block; }
   .amount-wrap { position:relative; margin-bottom: 12px; }
   .amount-wrap .euro { position:absolute; left:14px; top:50%; transform:translateY(-50%); color:#888; font-size:22px; font-weight:600; }
-  #amount {
+  #amount, #extraAmount {
     width:100%; background:#151515; border: 2px solid #2a2a2a; color:#fff;
     font-size: 28px; font-weight:700; padding: 16px 16px 16px 38px;
-    border-radius: 14px; outline:none; -webkit-appearance:none;
+    border-radius: 14px; outline:none; -webkit-appearance:none; appearance: none;
+    box-sizing: border-box; font-family: inherit;
   }
   #amount:focus { border-color:#4c7bff; }
+  #extraAmount:focus { border-color:#c84cff; }
+  #amount::-webkit-outer-spin-button, #amount::-webkit-inner-spin-button,
+  #extraAmount::-webkit-outer-spin-button, #extraAmount::-webkit-inner-spin-button {
+    -webkit-appearance: none; margin: 0;
+  }
   #note {
     width:100%; background:#151515; border:1px solid #2a2a2a; color:#fff;
     font-size:15px; padding: 12px 14px; border-radius:12px; outline:none; -webkit-appearance:none;
@@ -191,10 +197,13 @@
     box-shadow: 0 0 10px rgba(200,76,255,0.45);
   }
   #extraDesc {
-    width:100%; background:#151515; border:2px solid #2a2a2a; color:#fff;
-    font-size:15px; padding:14px; border-radius:12px; outline:none; margin-bottom:10px;
-    -webkit-appearance:none;
+    width:100%; box-sizing: border-box;
+    background:#151515; border:2px solid #2a2a2a; color:#fff;
+    font-size:18px; font-weight:500; padding:18px 16px;
+    border-radius:14px; outline:none; margin-bottom:12px;
+    -webkit-appearance:none; appearance:none; font-family: inherit;
   }
+  #extraDesc::placeholder { color:#666; }
   #extraDesc:focus { border-color:#c84cff; }
   #extraDesc.err, #extraAmount.err { border-color:#ff5252; }
 
